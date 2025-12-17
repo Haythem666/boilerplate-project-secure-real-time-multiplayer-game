@@ -4,35 +4,37 @@ const bodyParser = require('body-parser');
 const expect = require('chai');
 const socket = require('socket.io');
 const cors = require('cors');
+const helmet = require('helmet');
 
 const fccTestingRoutes = require('./routes/fcctesting.js');
 const runner = require('./test-runner.js');
 
 const app = express();
 
-app.use((req, res, next) => {
-  // Prevent MIME type sniffing
-  res.setHeader('X-Content-Type-Options', 'nosniff');
 
-  //Prevent XSS attacks
-  res.setHeader('X-XSS-Protection', '1; mode=block');
 
-  //Prevent caching
-  res.setHeader('Surrogate-Control', 'no-store');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+// Security headers via Helmet v3 (matches FCC tests exactly)
+//app.disable('x-powered-by');
 
-  //Set X-Powered-By header to PHP 7.4.3
-  //Disguise server technology
-  //Fait croire que le serveur utilise PHP au lieu de Node.js
-  res.setHeader('X-Powered-By', 'PHP 7.4.3');
-
-  next();
-})
 
 app.use('/public', express.static(process.cwd() + '/public'));
 app.use('/assets', express.static(process.cwd() + '/assets'));
+
+
+const nocache = require("nocache");
+
+app.use(
+  helmet({
+    noSniff: true,
+    xssFilter: true,
+    hidePoweredBy: {
+      setTo: "PHP 7.4.3",
+    },
+  })
+);
+
+app.use(nocache());
+
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -116,6 +118,15 @@ io.on('connection', (socket)=> {
 
     //send updated player position to all players
     io.emit('playerMoved', players[socket.id]);
+  });
+
+  // handle collectible collection: increment score and broadcast
+  socket.on('collect', ({ value }) => {
+    const inc = Number.isFinite(value) ? value : 1;
+    if (players[socket.id]) {
+      players[socket.id].score = (players[socket.id].score || 0) + inc;
+      io.emit('scoreUpdated', players[socket.id]);
+    }
   });
 
   //handle player disconnect

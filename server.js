@@ -75,3 +75,54 @@ const server = app.listen(portNum, () => {
 });
 
 module.exports = app; // For testing
+
+const io = socket(server);
+
+//store all connected players
+const players = {};
+
+io.on('connection', (socket)=> {
+  console.log('New Player connected: ' + socket.id);
+
+  const newPlayer = {
+    id:socket.id,
+    x: Math.floor(Math.random() * 500),
+    y: Math.floor(Math.random() * 500),
+    score: 0
+  };
+
+  players[socket.id] = newPlayer;
+
+  //send all the players to the new player
+  socket.emit('playersList', players);
+
+  //notify all other players about the new player
+  socket.broadcast.emit('newPlayer', newPlayer);
+
+  //handle player movement
+  socket.on('movePlayer', (direction) => {
+
+    const speed = 5;
+
+    if(direction === 'right'){
+      players[socket.id].x += speed;
+    } else if(direction === 'left'){
+      players[socket.id].x -= speed;
+    } else if(direction === 'up'){
+      players[socket.id].y -= speed;
+    } else if(direction === 'down'){
+      players[socket.id].y += speed;
+    }
+
+    //send updated player position to all players
+    io.emit('playerMoved', players[socket.id]);
+  });
+
+  //handle player disconnect
+  socket.on('disconnect', () => {
+    console.log('Player disconnected: ' , socket.id);
+    delete players[socket.id];
+    socket.broadcast.emit('playerDisconnected', socket.id);
+  });
+
+})

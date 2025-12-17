@@ -10,6 +10,27 @@ const runner = require('./test-runner.js');
 
 const app = express();
 
+app.use((req, res, next) => {
+  // Prevent MIME type sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+
+  //Prevent XSS attacks
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+
+  //Prevent caching
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  //Set X-Powered-By header to PHP 7.4.3
+  //Disguise server technology
+  //Fait croire que le serveur utilise PHP au lieu de Node.js
+  res.setHeader('X-Powered-By', 'PHP 7.4.3');
+
+  next();
+})
+
 app.use('/public', express.static(process.cwd() + '/public'));
 app.use('/assets', express.static(process.cwd() + '/assets'));
 
